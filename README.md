@@ -1,1 +1,1 @@
-# Modeling Real-Time Interactive Conversations as Diarized Timed Transcripts
+# Modeling Real-Time Interactive Conversations as Timed Diarized Transcripts
