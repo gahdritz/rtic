@@ -43,13 +43,7 @@ if(DEVICE == "cpu"):
 # Load the model and its tokenizer
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
 
-saved_stdout = sys.stdout
-saved_stderr = sys.stderr
-sys.stdout = open('trash', 'w')
-sys.stderr = open('trash_err', 'w')
 model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=torch.bfloat16, attn_implementation="eager")
-sys.stdout = saved_stdout
-sys.stderr = saved_stderr
 model.eval()
 model.to(DEVICE)
 
@@ -148,7 +142,6 @@ def sample(
         overhang = prompt.shape[-1] - past_key_values[0][0].shape[-2]
         print(f"OVERHANG: {overhang}")
         prompt = prompt[:, -overhang:]
-    speaker_present = False
     for i in range(max_tokens):
         out = model.forward(
             prompt,
@@ -156,41 +149,33 @@ def sample(
             use_cache=True,
         )
 
-#        print(f"Prompt: {prompt.shape}")
-#        if(past_key_values is not None):
-#            print(f"PKV: {past_key_values[0][0].shape}")
-#        else:
-#            print("None")
-
         logits = out.logits[:, -1, :]
 
         if("llama" in MODEL_DIR):
             if(i == 0):
                 allowed_tokens = LLAMA_SPACES # space token
-            elif(user_just_spoke and i == 1): # we don't want the model to continue speaking as the user
-                allowed_tokens = start_tokens_speaker
-            elif(not speaker_present and i == 1):
-                allowed_tokens = start_tokens_speaker + start_tokens_digit
-            elif((speaker_present and 2 <= i <= 4) or (not speaker_present and 2 <= i <= 3)):
+            elif(1 <= i <= 3):
                 allowed_tokens = digit_tokens
+            elif(i == 4):
+                allowed_tokens = start_tokens_speaker
             else:
                 allowed_tokens = None
         elif("gemma" in MODEL_DIR):
-            if(user_just_spoke and i == 0): # we don't want the model to continue speaking as the user
-                allowed_tokens = start_tokens_speaker
-            elif(i == 0):
-                allowed_tokens = start_tokens_speaker + GEMMA_SPACES
-            elif((speaker_present and 2 <= i <= 4) or (not speaker_present and 1 <= i <= 3)):
+            if(i == 0):
+                allowed_tokens = GEMMA_SPACES
+            elif(1 <= i <= 3):
                 allowed_tokens = digit_tokens
+            elif(i == 4):
+                allowed_tokens = start_tokens_speaker
             else:
                 allowed_tokens = None
         elif("pythia" in MODEL_DIR):
-            if(user_just_spoke and i == 0): # we don't want the model to continue speaking as the user
-                allowed_tokens = start_tokens_speaker
-            elif(i == 0):
-                allowed_tokens = start_tokens_speaker + start_tokens_digit
-            elif((speaker_present and 1 <= i <= 3) or (not speaker_present and 1 <= i <= 2)):
+            if(i == 0):
+                allowed_tokens = start_tokens_digit
+            elif(1 <= i <= 2):
                 allowed_tokens = digit_tokens
+            elif(i == 3):
+                allowed_tokens = start_tokens_speaker
             else:
                 allowed_tokens = None
         else:
@@ -198,12 +183,9 @@ def sample(
 
         next_token = sample_from_allowed_tokens(logits, allowed_tokens)
 
-        if(next_token in start_tokens_speaker):
-            speaker_present = True
-
         # Break if we hit a second start token
         if("gemma" in MODEL_DIR):
-            if(i != 0 and (next_token.item() in GEMMA_SPACES or next_token.item() in start_tokens_speaker)):
+            if(i != 0 and next_token.item() in GEMMA_SPACES):
                 break
         elif("pythia" in MODEL_DIR):
             if i != 0 and next_token.item() in (start_tokens_digit + start_tokens_speaker + stop_tokens):
@@ -211,10 +193,10 @@ def sample(
         elif("llama" in MODEL_DIR):
             if(i != 0 and next_token.item() in LLAMA_SPACES):
                 break
-            if(i == 1 and next_token.item() == HUMAN_ID_TOK):
+            if(i == 4 and next_token.item() == HUMAN_ID_TOK):
                 # Remove the space
-                past_key_values = prune_kv_cache(past_key_values, 1)
-                generated = generated[:, :-1]
+                past_key_values = prune_kv_cache(past_key_values, 4)
+                generated = generated[:, :-4]
                 break
 
         # past_key_values -> (bs, num_heads, seq_len, head_dim)
@@ -253,21 +235,10 @@ digit_tokens = [
     for c in "0123456789"
 ]
 
-#print([
-#    tokenizer.encode(f" {c}", add_special_tokens=False)
-#    for c in string.ascii_uppercase
-#])
-#print([
-#    tokenizer.encode(f" {c}", add_special_tokens=False)
-#    for c in "0123456789"
-#])
-#exit()
-
-
 # Start of the conversation (not very principled, but you need to
 # kickstart the LM)
 history = tokenizer.encode(
-    f" H121 alabama",
+    f" 121H alabama",
     return_tensors="pt",
 ).to(DEVICE)
 
@@ -310,20 +281,11 @@ while True:
                 continue
     
             if("llama" in MODEL_DIR):
-                if(not speaker_present):
-                    new_timestamp = new_tokens[0, 1:4]
-                else:
-                    new_timestamp = new_tokens[0, 2:5]
+                new_timestamp = new_tokens[0, 1:4]
             elif("gemma" in MODEL_DIR):
-                if(not speaker_present):
-                    new_timestamp = new_tokens[0, 1:4]
-                else:
-                    new_timestamp = new_tokens[0, 1:4]
+                new_timestamp = new_tokens[0, 1:4]
             elif("pythia" in MODEL_DIR):
-                if(not speaker_present):
-                    new_timestamp = new_tokens[0, 0:3]
-                else:
-                    new_timestamp = new_tokens[0, 1:4]
+                new_timestamp = new_tokens[0, 0:3]
             else:
                 raise ValueError()
   
