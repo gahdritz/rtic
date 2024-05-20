@@ -8,7 +8,7 @@ from transformers import (
     StoppingCriteria,
 )
 
-from ..utils.chat_utils import (
+from chatbot.chat_utils import (
     convert_chat,
     load_chat,
 )
@@ -172,28 +172,22 @@ for j in range(0, len(chat), CHUNK_SIZE):
             interruption_time_int = int(interruption_time)
 
             diff = draft_time_int - interruption_time_int
-            if(diff <= 0):
+            if(diff < 0):
                 # It would have been output already
-                print("Skip! (draft in past)")
                 continue
             else:
-                if(0 < diff < 10):
-                    adjust_idx = no_sigfigs
-                else:
-                    adjust_idx = 1
-    
-                interruption_time_digit_at_pos = (delimiter + interruption_time)[adjust_idx] 
-                digits_to_remove = range(int(interruption_time_digit_at_pos))
-                tokens_to_remove = [tokenizer.encode(f"{delimiter}{d}", add_special_tokens=False)[-1] for d in digits_to_remove]
-                for t in tokens_to_remove:
-                    draft_logits[adjust_idx][t] = 0
-    
-                draft_logits[adjust_idx] /= torch.sum(draft_logits[adjust_idx])
+                for adjust_idx in range(1, no_sigfigs + 1):
+                    draft_digit_at_pos = (delimiter + draft_time)[adjust_idx]
+                    interruption_digit_at_pos = (delimiter + interruption_time)[adjust_idx] 
+                    digits_to_remove = range(int(interruption_digit_at_pos))
+                    tokens_to_remove = [tokenizer.encode(f"{delimiter}{d}", add_special_tokens=False)[-1] for d in digits_to_remove]
+                    for t in tokens_to_remove:
+                        draft_logits[adjust_idx][t] = 0
+        
+                    draft_logits[adjust_idx] /= torch.sum(draft_logits[adjust_idx])
 
-
-#        while(new_tokens[del_idx] == new_toks_interruption[del_idx_interruption]):
-#            del_idx += 1
-#            del_idx_interruption += 1
+                    if(not draft_digit_at_pos == interruption_digit_at_pos):
+                        break
 
         start_idx = del_idx 
 
@@ -239,7 +233,7 @@ for j in range(0, len(chat), CHUNK_SIZE):
         counts.append(count)
         fracs.append(count / len(new_tokens[start_idx:]))
 
-        if(len(counts) == 300):
+        if(len(counts) == 200):
             print(f"Average: {sum(counts) / len(counts)}")
             print(f"Fractions: {sum(fracs) / len(fracs)}")
             exit()
