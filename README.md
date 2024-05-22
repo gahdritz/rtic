@@ -1,6 +1,6 @@
 # Modeling Real-Time Interactive Conversations as Timed Diarized Transcripts
 
-Code for the paper ``Modeling Real-Time Interactive Conversations as Timed Diarized Transcripts''
+Code for the paper "Modeling Real-Time Interactive Conversations as Timed Diarized Transcripts"
 
 Demo videos coming soon!
 
