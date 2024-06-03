@@ -1,8 +1,8 @@
 # Modeling Real-Time Interactive Conversations as Timed Diarized Transcripts
 
-Code for the paper "Modeling Real-Time Interactive Conversations as Timed Diarized Transcripts"
+https://github.com/gahdritz/rtic/assets/26167235/eac7dbe3-40af-4cb1-850a-5a37523fed91
 
-Demo videos coming soon!
+Code for the paper "Modeling Real-Time Interactive Conversations as Timed Diarized Transcripts"
 
 ## Chat application
 
